@@ -2,11 +2,42 @@ import { Note } from '../models/note.js';
 import createHttpError from 'http-errors';
 
 
+// Отримати список усіх нотаток
 export const getAllNotes = async (req, res) => {
-  const notes = await Note.find();
-  res.status(200).json(notes);
+  const { page = 1, perPage = 10, tag, search } = req.query;
+
+  const skip = (page - 1) * perPage;
+
+  // Формуємо об’єкт фільтра
+  const filter = {};
+
+  if (tag) {
+    filter.tag = tag;
+  }
+
+  if (search) {
+    filter.$text = { $search: search };
+  }
+
+  const notesQuery = Note.find(filter);
+
+  const [totalNotes, notes] = await Promise.all([
+    Note.countDocuments(filter),
+    notesQuery.skip(skip).limit(perPage),
+  ]);
+
+  const totalPages = Math.ceil(totalNotes / perPage);
+
+  res.status(200).json({
+    page,
+    perPage,
+    totalNotes,
+    totalPages,
+    notes,
+  });
 };
 
+// Отримати одну нотатку за id
 export const getNoteById = async (req, res, next) => {
   const { noteId } = req.params;
   const note = await Note.findById(noteId);
